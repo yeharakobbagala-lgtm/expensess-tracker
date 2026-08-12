@@ -42,9 +42,9 @@ public class SecurityConfig {
                 )
                 .formLogin(form -> form.disable())
                 .addFilterBefore(
-                jwtAuthenticationFilter,
-                UsernamePasswordAuthenticationFilter.class
-        );
+                        jwtAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                );
 
 
         return http.build();
