@@ -1,244 +1,267 @@
 # 💰 Expense Tracker
 
-A full-stack personal finance management application built with **React**, **Spring Boot**, **Spring Security**, and **MySQL**. The system provides authenticated users with isolation for tracking personal income, expenses, monthly budgets, savings goals, financial dashboards, and interactive analytics with **Sri Lanka-focused defaults** (`LKR` / `Rs.`, `Asia/Colombo`).
-
-> [!NOTE]
-> **Localization & Security Note:**  
-> * **Default Currency & Region:** Sri Lankan Rupee (`LKR`, formatted as `Rs.`) and timezone `Asia/Colombo`. Users can dynamically change their preferred currency (`Rs.`, `$`, `€`, `£`) in Settings.  
-> * **Fictional Sample Data:** All demo content and test placeholders use fictional Sri Lankan examples (e.g. `Yehara Perera`, `yehara@example.com`). No real personal credentials, emails, passwords, or live secrets are stored in code or configuration files.
+A full-stack personal finance management application built with **React** and **Spring Boot**. The application allows users to securely manage their income and expenses, create budgets and savings goals, view financial analytics, and manage user profiles with real-time financial tracking and data visualization.
 
 ---
 
-## 📌 2. Overview
+## 📌 1. PROJECT OVERVIEW
 
-### Problem & Purpose
-Managing personal finances requires tracking income and expenses across categories, maintaining monthly spending limits, and working toward long-term savings goals. Generic tools often lack database-enforced user isolation or real-time calculations directly derived from historical transactions.
+**Expense Tracker** is a full-stack personal finance management system designed to simplify personal budgeting and money tracking. It addresses the common challenge of unorganized financial tracking by providing a secure, centralized dashboard for recording transactions, establishing category budgets, monitoring savings goals, and visualizing spending trends.
 
-**Expense Tracker** was built to provide a secure, multi-tenant personal finance application where financial metrics (total balance, budget utilization, category breakdowns, savings rates, and analytics trends) are computed directly from the authenticated user's database records.
-
-### Communication & Data Handling
-* **Client-Server Architecture:** The React SPA communicates with the Spring Boot REST API using asynchronous HTTP requests via an abstracted API service layer (`api.js`).
-* **Stateless Token Authentication:** Requests carry a JSON Web Token (JWT) in the `Authorization: Bearer <token>` header.
-* **User Isolation:** Every protected database operation resolves the authenticated identity from Spring Security's `SecurityContextHolder`. The frontend never sends or chooses a `userId`; ownership is enforced on the backend.
-
-```mermaid
-graph TD
-    User["👤 User / Browser"] -->|"HTTP / REST (JWT)"| Frontend["⚛️ React Single Page App"]
-    Frontend -->|"Services (api.js)"| API["🌐 REST Endpoints"]
-    API -->|"SecurityFilter"| Auth["🛡️ Spring Security + JWT"]
-    Auth -->|"Context Scoped"| Controllers["🎮 Controllers"]
-    Controllers -->|"Business Rules"| Services["⚙️ Services"]
-    Services -->|"Data Operations"| Repositories["📦 JPA Repositories"]
-    Repositories -->|"ORM"| Database[("🛢️ MySQL Database")]
-```
+### Why It Was Built & Who It Is For
+Built with a modern client-server architecture, Expense Tracker is tailored for individual users and professionals who want clear visibility into their financial habits. The application features built-in localization defaults tailored for Sri Lankan users (such as default currency formatting in **LKR / Rs.** and multi-language UI support for **English**, **Sinhala**, and **Tamil**), while remaining fully configurable for international currencies.
 
 ---
 
-## 🚀 3. Key Features
+## ✨ 2. KEY FEATURES
 
-### 🔐 Authentication & Security
-* **User Registration:** Registers new users with full name, email, and password.
-* **BCrypt Password Hashing:** Hashes passwords using `BCryptPasswordEncoder` before database insertion.
-* **Login & JWT Issuance:** Verifies credentials and returns a signed 24-hour JWT containing the user's email subject.
-* **Stateless Security:** Disables session cookies; uses Spring Security `SessionCreationPolicy.STATELESS`.
+| Feature Area | Description |
+| :--- | :--- |
+| **Authentication** | User registration, login, JWT issuance, BCrypt password hashing, and stateless session control. |
+| **Transactions** | Full CRUD for income and expenses with title, amount, category, payment method, date, and notes. |
+| **Budgets** | Category-based budget limits with real-time spent, remaining, and percentage progress calculations. |
+| **Savings Goals** | Target savings goals with deadline tracking, progress rings, remaining amount, and days remaining. |
+| **Dashboard** | Financial summary metrics (total income, total expenses, net balance), monthly overviews, and category spending breakdown. |
+| **Analytics** | Graphical financial trends (monthly trends, income vs. expense, category spending) using Recharts. |
+| **Profile** | User profile management exposing name, email, and account info without leaking credentials. |
+| **Settings** | Preference controls for Currency (`Rs.`, `$`, `€`, `£`), Theme (Light/Dark mode), and Language (English, Sinhala, Tamil). |
 
-### 💳 Transaction Management (CRUD)
-* **Creation & Scoping:** Logged-in users create income or expense transactions with title, amount, category, payment method, date, and notes.
-* **Ownership Checks:** Updates (`PUT /api/transactions/{id}`) and deletions (`DELETE /api/transactions/{id}`) verify that the transaction's `user.id` matches the authenticated caller.
-* **Filtering & Pagination:** Frontend client allows searching by title, filtering by type (`income`/`expense`) and category, sorting by date/amount, and paginating records.
+### Feature Details
 
-### 📊 Dashboard
-* **Real-time Financial Totals:** Displays `totalBalance`, `totalIncome`, and `totalExpenses` calculated as:
-  $$\text{totalBalance} = \text{totalIncome} - \text{totalExpenses}$$
-* **Monthly Overview Chart:** 6-month historical area/bar charts rendered from `GET /api/dashboard/monthly`.
-* **Category Spending Breakdown:** Pie chart rendered from `GET /api/dashboard/categories`.
-* **Recent Feeds:** Displays the top 6 most recent transactions for quick audit.
-
-### 🎯 Budget Management (CRUD)
-* **Monthly Limits:** Users set monthly category budgets (e.g. `food`, `10000.0`, `2026-08`).
-* **Backend Calculations:** Spring Boot computes `spent`, `remaining`, and `percentageUsed` dynamically by querying the user's expense transactions for that matching category and period:
-  $$\text{spent} = \sum \text{Expense Transactions (matching category \& period)}$$
-  $$\text{remaining} = \text{limit} - \text{spent}$$
-  $$\text{percentageUsed} = \frac{\text{spent}}{\text{limit}} \times 100$$
-* **Over-Budget & Warning Indicators:** Visual warning triggers when spending exceeds 80% (`#f59e0b`) or exceeds 100% limit (`#e53935`).
-* **Duplicate Prevention:** Backend throws HTTP 409 Conflict if a user attempts to create multiple budgets for the same category and month.
-
-### 🎯 Savings Goals (CRUD)
-* **Target & Milestone Tracking:** Users create financial goals with title, target amount, current saved amount, deadline date, icon, and color.
-* **DTO Security:** Uses `GoalResponse` DTO to prevent exposing internal JPA `User` relationships or credentials.
-* **Progress Display:** Computes remaining amount ($\text{target} - \text{current}$) and completion percentage ($\frac{\text{current}}{\text{target}} \times 100$) for ring progress bars.
-
-### 📈 Analytics Deep-Dive
-* **Range-Filtered Analytics:** Supports `week`, `month`, `3months`, and `year` query parameters via `GET /api/analytics?range={range}`.
-* **Calculated Metrics:**
-  * **Monthly Spending Trend:** Area chart of historical expenses.
-  * **Income vs Expenses Comparison:** Grouped bar charts.
-  * **Savings Rate Trend:** Line chart calculated safely with zero-income protection:
-    $$\text{Savings Rate \%} = \begin{cases} \max\left(0, \text{round}\left(\frac{\text{income} - \text{expenses}}{\text{income}} \times 100\right)\right) & \text{if income} > 0 \\ 0 & \text{otherwise} \end{cases}$$
-  * **Category Breakdown:** Aggregated expense totals per category.
-  * **Weekly Spending:** Aggregated expense totals by calendar week.
+- **🔐 Authentication & Access Control:** Users register and authenticate using email and password. Protected REST API endpoints require a valid JWT passed in the `Authorization: Bearer <token>` header.
+- **💸 Transaction Management:** Users can record, edit, and delete transactions. Transactions are categorized (e.g., Food, Transport, Salary, Bills) and marked with payment methods (e.g., Cash, Card, Bank Transfer).
+- **💰 Budget Limits:** Set category spending limits for specific periods. Automatically updates spent and remaining amounts when transactions are added or modified.
+- **🎯 Financial Savings Goals:** Track long-term savings (e.g., Emergency Fund) with target amounts, current saved totals, target dates, custom icons, and visual progress indicators.
+- **📈 Visual Analytics:** Dynamic charts powered by Recharts render monthly spending trends, category proportions, and income vs. expense ratios.
+- **⚙️ Regional Preference Support:** Built-in support for Sri Lankan Rupee (`Rs.`), US Dollar (`$`), Euro (`€`), and British Pound (`£`), alongside UI language options for English (🇬🇧), Sinhala (🇱🇰), and Tamil (🇱🇰).
 
 ---
 
-## 🛠️ 4. Technology Stack
+## 🛠️ 3. TECHNOLOGY STACK
 
-### Frontend
-* **Core:** React 18, JavaScript (ES6+), HTML5, CSS3
-* **Build Tool:** Vite 8
-* **Routing:** React Router DOM v6
-* **Styling:** Tailwind CSS v4 (Vanilla CSS variables & custom utilities)
-* **Visualization:** Recharts v2
-* **Icons:** `lucide-react`
-* **HTTP Service:** Native Fetch API wrapped in `src/services/api.js`
-
-### Backend
-* **Language:** Java 17 / 21
-* **Framework:** Spring Boot 3
-* **Security:** Spring Security, JJWT (Java JWT `io.jsonwebtoken:jjwt-api`)
-* **Persistence:** Spring Data JPA, Hibernate ORM
-* **Password Encoding:** BCrypt (`BCryptPasswordEncoder`)
-
-### Database
-* **Relational DB:** MySQL 8.0+
-
-### Development Tools
-* **Build Tools:** Apache Maven Wrapper (`mvnw`), Node.js / npm
-* **API Testing:** Postman
-* **IDE:** VS Code / IntelliJ IDEA
+| Layer | Technology | Exact Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Frontend Framework** | React | `^19.0.0` | Declarative component-based UI |
+| **Frontend Build Tool** | Vite | `^8.0.0` | Development server & fast module bundling |
+| **Routing** | React Router DOM | `^7.18.2` | Client-side page navigation |
+| **Styling** | Tailwind CSS | `^4.0.0` | Utility-first CSS styling (`@tailwindcss/vite`) |
+| **Data Visualization** | Recharts | `^3.10.1` | Financial analytics & interactive charts |
+| **Icons** | Lucide React | `^1.31.0` | Modern SVG icons |
+| **Backend Framework** | Spring Boot | `4.1.0` parent (Spring 3.2.5 runtime) | RESTful web services & backend application framework |
+| **Language & JDK** | Java | `17` configured (JDK 21 compatible) | Core backend programming language |
+| **Security Framework** | Spring Security | 6.x | API protection, CORS & filter chain configuration |
+| **Authentication Token** | JJWT (io.jsonwebtoken) | `0.12.6` | Stateless JWT generation and verification |
+| **Password Hashing** | BCrypt | `BCryptPasswordEncoder` | Secure one-way password hashing |
+| **ORM & Persistence** | Spring Data JPA / Hibernate | 6.x | Entity-relational mapping & database repository pattern |
+| **Database Engine** | MySQL | `8.3.0` driver / Port `3306` | Relational data store (`expense_tracker` database) |
+| **Build & Dependency Tool**| Maven Wrapper (`mvnw.cmd`) | `3.x` | Cross-platform reproducible build execution |
+| **Version Control** | Git / GitHub | -- | Distributed version control & source code management |
 
 ---
 
-## 🏗️ 5. System Architecture
+## 🏗️ 4. SYSTEM ARCHITECTURE
 
-### Multi-Tier Architecture Diagram
+The application implements a decoupled client-server architecture where the React SPA communicates exclusively over HTTP REST APIs with the Spring Boot backend service.
 
 ```mermaid
 flowchart TD
-    subgraph Client ["Client Layer (Frontend)"]
-        UI["React UI Pages"] --> Context["AppContext"]
-        Context --> APIService["src/services/api.js"]
-    end
+    User["User / Browser"]
+    Frontend["React 19 Frontend<br/>(Port: 5173)"]
+    Vite["Vite Dev Server"]
+    API["Spring Boot REST API<br/>(Port: 8080)"]
+    Security["Spring Security + JwtAuthenticationFilter"]
+    Controller["Controller Layer"]
+    Service["Service Layer"]
+    Repository["Repository Layer"]
+    DB[("MySQL Database<br/>(Port: 3306)")]
 
-    subgraph Transport ["Transport Layer"]
-        APIService -->|"HTTP + Bearer JWT"| Network["REST Protocol"]
-    end
-
-    subgraph Backend ["Server Layer (Spring Boot)"]
-        Network --> Filter["JwtAuthenticationFilter"]
-        Filter --> SecContext["SecurityContextHolder"]
-        SecContext --> Controllers["REST Controllers"]
-        Controllers --> Services["Service Layer"]
-        Services --> Repos["Spring Data JPA Repositories"]
-    end
-
-    subgraph Persistence ["Persistence Layer"]
-        Repos --> Database[("MySQL Database")]
-    end
+    User -->|Interacts with| Frontend
+    Frontend -->|Served by| Vite
+    Frontend -->|HTTP / JSON + Bearer JWT| API
+    API --> Security
+    Security --> Controller
+    Controller --> Service
+    Service --> Repository
+    Repository -->|JPA / Hibernate| DB
 ```
 
-### Complete Authentication Execution Flow
+---
+
+## 💻 5. FRONTEND ARCHITECTURE
+
+The frontend is structured into modular React components, custom context providers, page views, and centralized HTTP request handlers.
+
+```mermaid
+flowchart TD
+    Pages["React Pages<br/>(Dashboard, Transactions, Budgets, Goals, etc.)"]
+    Components["UI Components & Layout<br/>(AppLayout, Button, Select, StatCard)"]
+    Context["App Context<br/>(AppContext.jsx)"]
+    APIService["API Service Layer<br/>(services/api.js)"]
+    Backend["Spring Boot REST API<br/>(http://localhost:8080/api)"]
+
+    Pages --> Components
+    Pages --> Context
+    Pages --> APIService
+    APIService -->|Fetch Requests| Backend
+```
+
+### Core Frontend Modules
+- **Pages:** `Dashboard.jsx`, `Transactions.jsx`, `AddTransaction.jsx`, `Budgets.jsx`, `Goals.jsx`, `Analytics.jsx`, `Profile.jsx`, `Settings.jsx`, `Login.jsx`, `Register.jsx`.
+- **Context Management:** `AppContext.jsx` manages user state, authentication status, theme (`light`/`dark`), language (`en`/`si`/`ta`), currency symbol (`Rs.`), and cached entity data.
+- **Service Layer (`services/api.js`):** Encapsulates native `fetch` logic, attaching `Authorization: Bearer <token>` headers to outgoing requests and standardizing error handling.
+
+---
+
+## ⚙️ 6. BACKEND ARCHITECTURE
+
+The Spring Boot backend enforces a clean layered architecture to isolate API handling, business rules, and database persistence.
+
+```mermaid
+flowchart TD
+    Client["React SPA"]
+    Controller["Controller Layer<br/>(AuthController, TransactionController, etc.)"]
+    Service["Service Layer<br/>(AuthService, TransactionService, etc.)"]
+    Repository["Repository Layer<br/>(UserRepository, TransactionRepository, etc.)"]
+    JPA["Spring Data JPA / Hibernate"]
+    DB[("MySQL Database")]
+
+    Client -->|REST JSON Request| Controller
+    Controller -->|Delegates to| Service
+    Service -->|Uses| Repository
+    Repository -->|Executes Queries via| JPA
+    JPA -->|JDBC Connection| DB
+```
+
+### Layer Responsibilities
+1. **Controller Layer:** Maps HTTP routes (`/api/...`), parses request bodies, validates input DTOs, and returns `ResponseEntity<T>` JSON objects.
+2. **Service Layer:** Executes core business logic, computes financial calculations, enforces user ownership checks, and calls repositories.
+3. **Repository Layer:** Extends `JpaRepository<T, ID>` to provide type-safe CRUD database operations.
+4. **Entity Layer:** Annotated Java classes representing MySQL database tables (`users`, `transactions`, `budgets`, `goals`).
+5. **DTO Layer:** Transfer objects (`LoginRequest`, `TransactionResponse`, `DashboardResponse`, `UserProfileResponse`, etc.) that safeguard sensitive entity details.
+
+---
+
+## 🔐 7. AUTHENTICATION FLOW
+
+Authentication is stateless and powered by JSON Web Tokens (JWT). Passwords are never stored in plain text.
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor User as User
-    participant React as React Frontend (api.js)
-    participant AuthCtrl as AuthController / AuthService
-    participant JWT as JwtService
+    actor User
+    participant Frontend as React Frontend
+    participant AuthController
+    participant AuthService
+    participant UserRepository
+    participant Database as MySQL DB
+    participant JwtService
+
+    User->>Frontend: Submit Login (email, password)
+    Frontend->>AuthController: POST /api/auth/login
+    AuthController->>AuthService: login(email, password)
+    AuthService->>UserRepository: findByEmail(email)
+    UserRepository->>Database: SELECT * FROM users WHERE email=?
+    Database-->>UserRepository: User entity
+    UserRepository-->>AuthService: User entity
+    AuthService->>AuthService: Verify password via BCryptPasswordEncoder
+    AuthService->>JwtService: generateToken(email)
+    JwtService-->>AuthService: Signed JWT string (24h expiry)
+    AuthService-->>AuthController: JWT token
+    AuthController-->>Frontend: 200 OK (LoginResponse)
+    Frontend->>Frontend: Save token in localStorage & update AppContext state
+```
+
+---
+
+## 🔄 8. AUTHENTICATED REQUEST FLOW
+
+Every protected request includes the user's JWT token in the `Authorization` header.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Frontend as React Frontend
     participant Filter as JwtAuthenticationFilter
-    participant SecCtx as SecurityContextHolder
-    participant Endpoint as Protected Controller / Service
-    participant DB as MySQL Database
+    participant Security as SecurityContext
+    participant Controller as TransactionController
+    participant Service as TransactionService
+    participant DB as MySQL DB
 
-    User->>React: Enters email & password
-    React->>AuthCtrl: POST /api/auth/login
-    AuthCtrl->>DB: findByEmail(email)
-    DB-->>AuthCtrl: User entity (with BCrypt hash)
-    AuthCtrl->>AuthCtrl: PasswordEncoder.matches()
-    AuthCtrl->>JWT: generateToken(email)
-    JWT-->>React: { "token": "eyJhbG..." }
-    React->>React: Save token to localStorage
-
-    Note over User, DB: Subsequent Authenticated Requests (e.g. GET /api/dashboard)
-
-    React->>Filter: GET /api/dashboard (Header: Authorization: Bearer eyJhbG...)
-    Filter->>JWT: extractEmail(token)
-    JWT-->>Filter: email (e.g. user@example.com)
-    Filter->>SecCtx: setAuthentication(UsernamePasswordAuthenticationToken)
-    Filter->>Endpoint: Forward request
-    Endpoint->>SecCtx: getAuthentication().getName()
-    SecCtx-->>Endpoint: user@example.com
-    Endpoint->>DB: findByEmail("user@example.com")
-    DB-->>Endpoint: User Entity
-    Endpoint->>DB: Query User-scoped data
-    DB-->>Endpoint: User Data
-    Endpoint-->>React: 200 OK DTO Response
+    User->>Frontend: Access /api/transactions
+    Frontend->>Filter: GET /api/transactions (Header: Authorization: Bearer <JWT>)
+    Filter->>Filter: Extract token & verify HMAC-SHA signature
+    Filter->>Security: Set UsernamePasswordAuthenticationToken(email)
+    Filter->>Controller: Continue filter chain to target controller
+    Controller->>Service: getMyTransactions()
+    Service->>Security: Retrieve current user email from SecurityContext
+    Service->>DB: SELECT * FROM transactions WHERE user_id=?
+    DB-->>Service: Transaction entity list
+    Service-->>Controller: List<TransactionResponse> DTOs
+    Controller-->>Frontend: 200 OK (JSON array)
+    Frontend-->>User: Render transactions UI
 ```
 
 ---
 
-## 🔑 6. Authentication & Authorization
+## 🧠 9. AUTHENTICATION VS AUTHORIZATION
 
-### Registration Flow
-1. User posts payload to `POST /api/auth/register`:
-   ```json
-   {
-     "fullName": "Yehara Kobbagala",
-     "email": "yehara@example.com",
-     "password": "securePassword123"
-   }
-   ```
-2. `AuthService.register()` checks if email already exists in `UserRepository`. If present, throws `RuntimeException("Email already registered")`.
-3. Password is encrypted via `passwordEncoder.encode(rawPassword)`.
-4. `User` entity is saved to MySQL. Plaintext passwords are never stored.
-
-### Login Flow
-1. User posts credentials to `POST /api/auth/login`:
-   ```json
-   {
-     "email": "yehara@example.com",
-     "password": "securePassword123"
-   }
-   ```
-2. `AuthService.login()` queries `userRepository.findByEmail(email)`.
-3. `passwordEncoder.matches(rawPassword, encodedPassword)` validates credentials.
-4. `JwtService.generateToken(email)` signs a 24-hour token with HMAC-SHA256.
-5. Returns `LoginResponse` containing `{ "token": "..." }`.
-
-### Authenticated Request Execution
-For every protected request, `src/services/api.js` automatically attaches:
-```http
-Authorization: Bearer <token>
-```
-`JwtAuthenticationFilter` intercepts the request:
-1. Extracts `token` from `Authorization` header.
-2. Validates expiration and signature against the backend secret key.
-3. Extracts the subject (`email`).
-4. Populates `SecurityContextHolder.getContext().setAuthentication(...)`.
-5. Controllers and services extract identity via `SecurityContextHolder.getContext().getAuthentication().getName()` to load the database `User`.
+- **Authentication ("Who are you?"):** Handled when the user logs in. The system verifies credentials against BCrypt hashes and issues a 24-hour signed JWT containing the user's email.
+- **Authorization ("What are you allowed to access?"):** Handled on every request. Spring Security requires requests to be authenticated (`.anyRequest().authenticated()`). Furthermore, service methods extract the authenticated user's email directly from `SecurityContextHolder` to scope queries exclusively to records owned by that user (`WHERE user_id = :userId`). A user cannot view, edit, or delete another user's transactions, budgets, goals, or profile data.
 
 ---
 
-## 🔒 7. User Handling & Data Isolation
+## 🛡️ 10. SECURITY ARCHITECTURE
 
-The frontend **never** dictates entity ownership. The backend completely ignores `userId` fields passed in request bodies and resolves ownership strictly from the active Security Context.
+| Security Mechanism | Implementation Details |
+| :--- | :--- |
+| **Authentication Token** | JSON Web Token (JWT) via JJWT `0.12.6` |
+| **Token Expiration** | 24 Hours (`86400000` ms) |
+| **Token Signing** | HMAC-SHA with 256-bit secret key |
+| **Password Hashing** | `BCryptPasswordEncoder` |
+| **Session Policy** | `SessionCreationPolicy.STATELESS` |
+| **Request Filter** | `JwtAuthenticationFilter` executing before `UsernamePasswordAuthenticationFilter` |
+| **CORS Configuration** | Allowed origins: `http://localhost:*`, `http://127.0.0.1:*`; Methods: `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`, `PATCH` |
+| **CSRF Configuration** | Disabled (`csrf.disable()`) for stateless REST APIs |
+| **Public Routes** | `POST /api/auth/register`, `POST /api/auth/login` |
+| **Data Isolation** | User ownership checks enforced in Service layer |
+
+---
+
+## 👤 11. USER HANDLING & DATA ISOLATION
+
+Data security relies on server-managed identity extraction rather than trusting user IDs supplied by the frontend.
+
+```text
+Incoming JWT ──> JwtAuthenticationFilter ──> Extract Email ──> SecurityContext
+                                                                   │
+                                                                   ▼
+MySQL Database <── Filter Query by User ID <── Lookup User <── Current User Email
+```
+
+1. **Email Resolution:** The service layer obtains `SecurityContextHolder.getContext().getAuthentication().getName()` to resolve the authenticated email.
+2. **User Scope:** The system queries `UserRepository.findByEmail(email)` to fetch the user entity.
+3. **Database Scoping:** All operations (`findByUser`, `findByUserAndCategory`, etc.) pass the fetched `User` entity to ensure users only mutate their own financial data.
+
+---
+
+## 🗄️ 12. DATABASE ARCHITECTURE
+
+The application uses MySQL relational storage managed by Spring Data JPA and Hibernate (`spring.jpa.hibernate.ddl-auto=update`).
 
 ```mermaid
 erDiagram
-    USERS ||--o{ TRANSACTIONS : owns
-    USERS ||--o{ BUDGETS : owns
-    USERS ||--o{ GOALS : owns
+    USER ||--o{ TRANSACTION : "owns"
+    USER ||--o{ BUDGET : "owns"
+    USER ||--o{ GOAL : "owns"
 
-    USERS {
+    USER {
         bigint id PK
-        string email UK
         string full_name
+        string email UK
         string password
     }
 
-    TRANSACTIONS {
+    TRANSACTION {
         bigint id PK
-        bigint user_id FK
         string type
         string title
         double amount
@@ -246,500 +269,371 @@ erDiagram
         string method
         date date
         string notes
+        bigint user_id FK
     }
 
-    BUDGETS {
+    BUDGET {
         bigint id PK
-        bigint user_id FK
         string category
         double budget_limit
         string period
+        bigint user_id FK
     }
 
-    GOALS {
+    GOAL {
         bigint id PK
-        bigint user_id FK
         string title
         double target
         double current
         date deadline
         string icon
         string color
+        bigint user_id FK
     }
 ```
 
-### Authorization Checks in Service Layer
-To prevent cross-tenant data tampering (e.g. User A modifying User B's resource by altering an ID in the URL):
+---
 
-```java
-// Example from TransactionService / BudgetService / GoalService
-User user = getCurrentUser();
-Transaction existing = transactionRepository.findById(id)
-        .orElseThrow(() -> new RuntimeException("Transaction not found"));
+## 🌐 13. API DOCUMENTATION
 
-if (!existing.getUser().getId().equals(user.getId())) {
-    throw new RuntimeException("Unauthorized transaction access");
-}
-```
+### Authentication Endpoints (`/api/auth`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/register` | Public | Register a new user (`fullName`, `email`, `password`) |
+| `POST` | `/api/auth/login` | Public | Authenticate user & return JWT token |
+
+### Transaction Endpoints (`/api/transactions`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/transactions` | Bearer JWT | Retrieve all transactions for authenticated user |
+| `POST` | `/api/transactions` | Bearer JWT | Create a new transaction |
+| `PUT` | `/api/transactions/{id}` | Bearer JWT | Update an existing transaction |
+| `DELETE` | `/api/transactions/{id}` | Bearer JWT | Delete a transaction |
+
+### Budget Endpoints (`/api/budgets`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/budgets` | Bearer JWT | Fetch budgets with calculated spent and remaining totals |
+| `POST` | `/api/budgets` | Bearer JWT | Create a category budget limit |
+| `PUT` | `/api/budgets/{id}` | Bearer JWT | Update budget category or limit |
+| `DELETE` | `/api/budgets/{id}` | Bearer JWT | Delete a category budget |
+
+### Savings Goal Endpoints (`/api/goals`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/goals` | Bearer JWT | Retrieve savings goals with progress calculations |
+| `POST` | `/api/goals` | Bearer JWT | Create a new financial savings goal |
+| `PUT` | `/api/goals/{id}` | Bearer JWT | Update goal details or saved amounts |
+| `DELETE` | `/api/goals/{id}` | Bearer JWT | Delete a savings goal |
+
+### Dashboard Endpoints (`/api/dashboard`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/dashboard` | Bearer JWT | Summary totals (Total Income, Expenses, Balance, Recent Txns) |
+| `GET` | `/api/dashboard/monthly` | Bearer JWT | Monthly breakdown overview |
+| `GET` | `/api/dashboard/categories` | Bearer JWT | Spending totals per category |
+
+### Analytics Endpoints (`/api/analytics`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/analytics?range=month` | Bearer JWT | Financial visualization metrics for selected timeframe |
+
+### User Profile Endpoints (`/api/users`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/users/me` | Bearer JWT | Fetch profile data for authenticated user |
+| `PUT` | `/api/users/me` | Bearer JWT | Update name or email for authenticated user |
 
 ---
 
-## 🛡️ 8. Security Architecture
+## 🔌 14. PORTS & SERVICE MAPPING
 
-### JWT Implementation Details
-* **Algorithm:** HMAC-SHA256 via `Keys.hmacShaKeyFor(secretKey.getBytes())`.
-* **Validity:** 86,400,000 ms (24 hours).
-* **Invalid / Expired Tokens:** `JwtAuthenticationFilter` catches parsing/validation exceptions, clears security context, and responds immediately with `HTTP 401 Unauthorized`.
-
-### Password Security
-* Hashes passwords using Spring Security's `BCryptPasswordEncoder`. Passwords are never logged or stored in plain text.
-
-### Endpoint Security Mapping
-```java
-.authorizeHttpRequests(auth -> auth
-    .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
-    .anyRequest().authenticated()
-)
-```
-
-### CORS Configuration
-Configured in `SecurityConfig.java` to allow local cross-origin development requests:
-```java
-CorsConfiguration configuration = new CorsConfiguration();
-configuration.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
-configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-configuration.setAllowedHeaders(List.of("*"));
-configuration.setAllowCredentials(true);
-```
-
-### API Response Security & Password Exposure Protection
-* All `@ManyToOne private User user` relationships in `Transaction.java`, `Budget.java`, and `Goal.java` are annotated with `@JsonIgnore` from `com.fasterxml.jackson.annotation.JsonIgnore`.
-* Sensitive credentials (passwords/hashes) are excluded from all JSON serializations.
-* Data transfer objects (`TransactionResponse`, `BudgetResponse`, `GoalResponse`, `UserProfileResponse`) sanitize response structures.
-
----
-
-## 🏛️ 9. Backend Architecture
-
-The backend follows the standard Spring Boot layered design pattern:
+| Service | Port | Base URL / Connection |
+| :--- | :--- | :--- |
+| **React Frontend (Vite)** | `5173` | `http://localhost:5173/` |
+| **Spring Boot REST API** | `8080` | `http://localhost:8080/api` |
+| **MySQL Database** | `3306` | `jdbc:mysql://localhost:3306/expense_tracker` |
 
 ```mermaid
 flowchart LR
-    Controller["Controller Layer\n(Handles HTTP & Mapping)"] --> Service["Service Layer\n(Business Logic & Ownership)"]
-    Service --> Repository["Repository Layer\n(Spring Data JPA / SQL)"]
-    Repository --> DB[("MySQL DB")]
+    Frontend["React / Vite<br/>Port: 5173"]
+    Backend["Spring Boot API<br/>Port: 8080"]
+    Database[("MySQL<br/>Port: 3306")]
+
+    Frontend -->|REST / JSON Requests| Backend
+    Backend -->|JDBC / SQL Queries| Database
 ```
 
-* **Controller Layer:** Receives HTTP payloads, delegates execution to services, and returns `ResponseEntity<T>`.
-* **Service Layer:** Manages security context lookups, ownership validations, transaction filtering, mathematical calculations, and entity persistence.
-* **Repository Layer:** Extends `JpaRepository<T, Long>` to execute type-safe SQL queries (e.g., `findByUser`, `findByUserAndCategoryAndPeriod`).
-
 ---
 
-## 💡 10. Important Backend Design Decisions
+## 📁 15. PROJECT STRUCTURE
 
-1. **Security Context as Single Source of Truth:** `userId` is never accepted from client inputs. The active user is always extracted from the validated JWT token.
-2. **DTO Scoping:** Controller endpoints return custom DTOs (`GoalResponse`, `BudgetResponse`, `TransactionResponse`) to decouple internal database schemas from external presentation models.
-3. **Backend Calculation Engine:** `totalBalance`, monthly area chart arrays, budget `spent`/`remaining`/`percentageUsed`, and analytics aggregations are computed dynamically from transaction records to guarantee mathematical consistency across all devices.
-
----
-
-## 📐 11. Dashboard Calculations
-
-* **`totalIncome`**: Sum of all `Transaction` amounts owned by the user where `type == "income"`.
-* **`totalExpenses`**: Sum of all `Transaction` amounts owned by the user where `type == "expense"`.
-* **`totalBalance`**:
-  $$\text{totalBalance} = \text{totalIncome} - \text{totalExpenses}$$
-
----
-
-## 📐 12. Budget Calculations
-
-Computed inside `BudgetService.getMyBudgets()`:
-* **`spent`**:
-  $$\text{spent} = \sum_{\substack{t \in \text{Transactions} \\ t.\text{type} = \text{"expense"} \\ t.\text{category} = B.\text{category} \\ \text{YearMonth}(t.\text{date}) = B.\text{period}}} t.\text{amount}$$
-* **`remaining`**: $\text{limit} - \text{spent}$
-* **`percentageUsed`**:
-  $$\text{percentageUsed} = \begin{cases} 0 & \text{if limit} = 0 \\ \frac{\text{spent}}{\text{limit}} \times 100 & \text{otherwise} \end{cases}$$
-
----
-
-## 📐 13. Goal Calculations
-
-Calculated client-side inside `Goals.jsx` for rendering ring progress charts:
-* **`pct`**: $\min\left(100, \frac{\text{current}}{\text{target}} \times 100\right)$
-* **`remaining`**: $\text{target} - \text{current}$
-* **`daysLeft`**: Days remaining between current date and `deadline`.
-
----
-
-## 📐 14. Analytics Calculations
-
-Computed inside `AnalyticsService.getAnalytics(range)`:
-* **`monthlyData`**: Historical monthly breakdown of total income vs expenses for the requested range.
-* **`categorySpending`**: Expense amounts grouped by category ID.
-* **`weeklyData`**: Expense amounts grouped by week index for the current month.
-* **`savingsRate`**: Computed safely on frontend with zero-income guardrails:
-  $$\text{savingsRate} = \begin{cases} 0 & \text{if income} \le 0 \\ \max\left(0, \text{round}\left(\frac{\text{income} - \text{expenses}}{\text{income}} \times 100\right)\right) & \text{otherwise} \end{cases}$$
-
----
-
-## 📑 15. API Documentation
-
-| Endpoint | Method | Auth Required | Request Body | Response Body / Purpose |
-| :--- | :--- | :--- | :--- | :--- |
-| `/api/auth/register` | `POST` | ❌ No | `{fullName, email, password}` | Registers user (`200 OK`) |
-| `/api/auth/login` | `POST` | ❌ No | `{email, password}` | Returns `{ "token": "..." }` |
-| `/api/users/me` | `GET` | ✅ Yes | None | Returns `{ id, fullName, email }` |
-| `/api/users/me` | `PUT` | ✅ Yes | `{name, email}` | Updates profile info |
-| `/api/transactions` | `GET` | ✅ Yes | None | Returns `List<TransactionResponse>` |
-| `/api/transactions` | `POST` | ✅ Yes | `{type, title, amount, category, method, date, notes}` | Creates transaction entity |
-| `/api/transactions/{id}`| `PUT` | ✅ Yes | `{type, title, amount, category, method, date, notes}` | Updates transaction entity |
-| `/api/transactions/{id}`| `DELETE`| ✅ Yes | None | Deletes transaction (`204 No Content`) |
-| `/api/dashboard` | `GET` | ✅ Yes | None | Returns `DashboardResponse` |
-| `/api/dashboard/monthly`| `GET`| ✅ Yes | None | Returns `List<MonthlyOverviewResponse>` |
-| `/api/dashboard/categories`| `GET`| ✅ Yes | None | Returns `List<CategorySpendingResponse>` |
-| `/api/budgets` | `GET` | ✅ Yes | None | Returns `List<BudgetResponse>` |
-| `/api/budgets` | `POST` | ✅ Yes | `{category, limit, period}` | Creates category budget |
-| `/api/budgets/{id}` | `PUT` | ✅ Yes | `{category, limit, period}` | Updates budget entity |
-| `/api/budgets/{id}` | `DELETE`| ✅ Yes | None | Deletes budget (`204 No Content`) |
-| `/api/goals` | `GET` | ✅ Yes | None | Returns `List<GoalResponse>` |
-| `/api/goals` | `POST` | ✅ Yes | `{title, target, current, deadline, icon, color}` | Creates savings goal |
-| `/api/goals/{id}` | `PUT` | ✅ Yes | `{title, target, current, deadline, icon, color}` | Updates goal entity |
-| `/api/goals/{id}` | `DELETE`| ✅ Yes | None | Deletes goal (`204 No Content`) |
-| `/api/analytics` | `GET` | ✅ Yes | Query Param `?range=week|month|3months|year` | Returns `AnalyticsResponse` |
-
----
-
-## 🔄 16. Example API Flow
-
-```http
-POST /api/auth/login HTTP/1.1
-Host: localhost:8080
-Content-Type: application/json
-
-{
-  "email": "yehara@example.com",
-  "password": "mySecretPassword"
-}
+```text
+expensess-tracker/
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── layout/       # AppLayout, Navbar, Sidebar
+│   │   │   ├── ui/           # Button, Input, Modal, Select
+│   │   │   └── transactions/ # Transaction filters & cards
+│   │   ├── context/          # AppContext.jsx
+│   │   ├── data/             # mockData.js, translations.js
+│   │   ├── pages/            # Dashboard, Transactions, Budgets, Goals, Analytics, Profile, Settings, Login, Register
+│   │   └── services/         # api.js
+│   ├── index.html
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── vite.config.ts
+├── src/
+│   ├── main/
+│   │   ├── java/com/example/expensesstracker/
+│   │   │   ├── config/       # SecurityConfig, JwtAuthenticationFilter
+│   │   │   ├── controller/   # Auth, Transaction, Budget, Goal, Dashboard, Analytics, User controllers
+│   │   │   ├── dto/          # LoginRequest, TransactionResponse, DashboardResponse, etc.
+│   │   │   ├── entity/       # User, Transaction, Budget, Goal
+│   │   │   ├── repository/   # JpaRepositories
+│   │   │   ├── service/      # Auth, Jwt, Transaction, Budget, Goal, Dashboard, Analytics, User services
+│   │   │   └── ExpensessTrackerApplication.java
+│   │   └── resources/
+│   │       └── application.properties
+│   └── test/
+├── .gitignore
+├── mvnw
+├── mvnw.cmd
+├── pom.xml
+└── README.md
 ```
 
-**Response:**
+---
+
+## 🔄 16. FRONTEND ↔ BACKEND COMMUNICATION
+
+Communication relies on standard JSON over HTTP:
+
+1. **Request Construction:** `frontend/src/services/api.js` builds HTTP calls targeting `http://localhost:8080/api`.
+2. **Token Injection:** `api.js` inspects `localStorage.getItem('token')` and appends `Authorization: Bearer <token>` to headers.
+3. **Backend Processing:** Spring Security intercepts the request, `JwtAuthenticationFilter` validates token signature, and the controller executes.
+4. **JSON Parsing:** Response payload is returned as JSON and parsed by `request()` helper.
+
+---
+
+## 📊 17. FINANCIAL CALCULATIONS
+
+All summary statistics are calculated server-side from transaction records:
+
+- **Total Income:**  
+  $$\text{Total Income} = \sum \text{amount where type} = \text{"income"}$$
+- **Total Expenses:**  
+  $$\text{Total Expenses} = \sum \text{amount where type} = \text{"expense"}$$
+- **Net Balance:**  
+  $$\text{Net Balance} = \text{Total Income} - \text{Total Expenses}$$
+- **Budget Remaining & Percentage:**  
+  $$\text{Spent} = \sum \text{expense amount in budget category}$$  
+  $$\text{Remaining} = \text{Budget Limit} - \text{Spent}$$  
+  $$\text{Percentage Used} = \min\left(100, \left(\frac{\text{Spent}}{\text{Budget Limit}}\right) \times 100\right)$$
+- **Savings Goal Progress:**  
+  $$\text{Progress \%} = \min\left(100, \left(\frac{\text{Current Saved}}{\text{Target Amount}}\right) \times 100\right)$$
+
+---
+
+## 📝 18. API REQUEST EXAMPLE
+
+### 1. Register User
+`POST /api/auth/register`
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ5ZWhhcmFAZXhhbXBsZS5jb20iLCJpYXQiOjE3NTQ5..."
+  "fullName": "Test User",
+  "email": "user@example.com",
+  "password": "SecurePassword123!"
 }
 ```
 
-**Subsequent Request:**
-```http
-GET /api/dashboard HTTP/1.1
-Host: localhost:8080
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ5ZWhhcmFAZXhhbXBsZS5jb20iLCJpYXQiOjE3NTQ5...
-```
-
-**Response:**
+### 2. Login User
+`POST /api/auth/login`
 ```json
 {
-  "totalBalance": 35000.0,
-  "totalIncome": 40000.0,
-  "totalExpenses": 5000.0
+  "email": "user@example.com",
+  "password": "SecurePassword123!"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzI...[JWT_STRING]"
+}
+```
+
+### 3. Create Transaction (Authenticated)
+`POST /api/transactions`  
+*Header:* `Authorization: Bearer eyJhbGciOi...`
+```json
+{
+  "title": "Grocery Shopping",
+  "amount": 4500.00,
+  "type": "expense",
+  "category": "Food",
+  "method": "Card",
+  "date": "2026-08-14",
+  "notes": "Supermarket purchase"
 }
 ```
 
 ---
 
-## 🗄️ 17. Database Schema
-
-### Table Definitions
-
-#### `users`
-* `id` (`BIGINT`, PK, Auto-Increment)
-* `full_name` (`VARCHAR(255)`, Not Null)
-* `email` (`VARCHAR(255)`, Not Null, Unique)
-* `password` (`VARCHAR(255)`, Not Null)
-
-#### `transactions`
-* `id` (`BIGINT`, PK, Auto-Increment)
-* `user_id` (`BIGINT`, FK $\rightarrow$ `users.id`, Not Null)
-* `type` (`VARCHAR(255)`, Not Null)
-* `title` (`VARCHAR(255)`, Not Null)
-* `amount` (`DOUBLE`, Not Null)
-* `category` (`VARCHAR(255)`, Not Null)
-* `method` (`VARCHAR(255)`, Not Null)
-* `date` (`DATE`, Not Null)
-* `notes` (`VARCHAR(255)`)
-
-#### `budgets`
-* `id` (`BIGINT`, PK, Auto-Increment)
-* `user_id` (`BIGINT`, FK $\rightarrow$ `users.id`, Not Null)
-* `category` (`VARCHAR(255)`, Not Null)
-* `budget_limit` (`DOUBLE`, Not Null)
-* `period` (`VARCHAR(255)`, Not Null)
-
-#### `goals`
-* `id` (`BIGINT`, PK, Auto-Increment)
-* `user_id` (`BIGINT`, FK $\rightarrow$ `users.id`, Not Null)
-* `title` (`VARCHAR(255)`, Not Null)
-* `target` (`DOUBLE`, Not Null)
-* `current` (`DOUBLE`, Not Null)
-* `deadline` (`DATE`, Not Null)
-* `icon` (`VARCHAR(255)`, Not Null)
-* `color` (`VARCHAR(255)`, Not Null)
-
----
-
-## 📁 18. Project Structure
-
-```
-d:/projects/expensess tracker/
-├── expensess tracker/                 # Spring Boot Backend Project Root
-│   ├── mvnw / mvnw.cmd               # Maven Wrapper Scripts
-│   ├── pom.xml                        # Maven Build & Dependency Configuration
-│   └── src/
-│       └── main/
-│           ├── java/com/example/expensessTracker/
-│           │   ├── ExpensessTrackerApplication.java
-│           │   ├── config/
-│           │   │   ├── JwtAuthenticationFilter.java
-│           │   │   └── SecurityConfig.java
-│           │   ├── controller/
-│           │   │   ├── AnalyticsController.java
-│           │   │   ├── AuthController.java
-│           │   │   ├── BudgetController.java
-│           │   │   ├── DashboardController.java
-│           │   │   ├── GoalController.java
-│           │   │   ├── TransactionController.java
-│           │   │   └── UserController.java
-│           │   ├── dto/
-│           │   │   ├── AnalyticsResponse.java
-│           │   │   ├── BudgetResponse.java
-│           │   │   ├── CategorySpendingResponse.java
-│           │   │   ├── DashboardResponse.java
-│           │   │   ├── GoalResponse.java
-│           │   │   ├── LoginRequest.java
-│           │   │   ├── LoginResponse.java
-│           │   │   ├── MonthlyOverviewResponse.java
-│           │   │   ├── TransactionResponse.java
-│           │   │   └── UserProfileResponse.java
-│           │   ├── entity/
-│           │   │   ├── Budget.java
-│           │   │   ├── Goal.java
-│           │   │   ├── Transaction.java
-│           │   │   └── User.java
-│           │   ├── repository/
-│           │   │   ├── BudgetRepository.java
-│           │   │   ├── GoalRepository.java
-│           │   │   ├── TransactionRepository.java
-│           │   │   └── UserRepository.java
-│           │   └── service/
-│           │       ├── AnalyticsService.java
-│           │       ├── AuthService.java
-│           │       ├── BudgetService.java
-│           │       ├── DashboardService.java
-│           │       ├── GoalService.java
-│           │       ├── JwtService.java
-│           │       ├── TransactionService.java
-│           │       └── UserService.java
-│           └── resources/
-│               └── application.properties
-│
-└── frontend/                          # React Frontend Project Root
-    ├── package.json
-    ├── vite.config.ts
-    ├── index.html
-    └── src/
-        ├── App.tsx
-        ├── main.tsx
-        ├── index.css
-        ├── components/
-        │   ├── layout/
-        │   │   ├── AppLayout.jsx
-        │   │   ├── Navbar.jsx
-        │   │   └── Sidebar.jsx
-        │   ├── transactions/
-        │   │   └── TransactionForm.jsx
-        │   └── ui/
-        │       ├── Badge.jsx
-        │       ├── Button.jsx
-        │       ├── ConfirmDialog.jsx
-        │       ├── EmptyState.jsx
-        │       ├── Input.jsx
-        │       ├── Modal.jsx
-        │       ├── Select.jsx
-        │       └── SummaryCard.jsx
-        ├── context/
-        │   └── AppContext.jsx
-        ├── data/
-        │   └── mockData.js
-        ├── pages/
-        │   ├── AddTransaction.jsx
-        │   ├── Analytics.jsx
-        │   ├── Budgets.jsx
-        │   ├── Dashboard.jsx
-        │   ├── Goals.jsx
-        │   ├── Login.jsx
-        │   ├── Profile.jsx
-        │   ├── Register.jsx
-        │   ├── Settings.jsx
-        │   └── Transactions.jsx
-        └── services/
-            └── api.js
-```
-
----
-
-## ⚡ 19. Setup & Installation
+## 🖥️ 19. SETUP & INSTALLATION
 
 ### Prerequisites
-* **Java Development Kit (JDK):** Version 17 or 21
-* **Node.js:** Version 18.x or 20.x
-* **MySQL Server:** Version 8.0 or higher
+- **Node.js** (v18+)
+- **Java JDK 21** (or JDK 17+)
+- **MySQL Server** (running on port `3306`)
+- **Git**
 
-### 1. Database Setup
-Launch MySQL terminal or Workbench and create the database schema:
-```sql
-CREATE DATABASE expense_tracker;
-```
+---
 
-### 2. Backend Configuration & Launch
-Navigate to `expensess tracker/src/main/resources/application.properties` and update your local database credentials:
-```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/expense_tracker?useSSL=false&serverTimezone=UTC
-spring.datasource.username=YOUR_MYSQL_USERNAME
-spring.datasource.password=YOUR_MYSQL_PASSWORD
+### 🚀 Step 1: Start Backend (Spring Boot)
 
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
-```
+1. Open PowerShell in project root:
+   ```powershell
+   cd "d:\projects\expensess tracker\expensess tracker"
+   ```
+2. Set JDK 21 in your terminal if multiple Java versions exist:
+   ```powershell
+   $env:JAVA_HOME="C:\Program Files\Java\jdk-21.0.11"
+   $env:Path="$env:JAVA_HOME\bin;$env:Path"
+   ```
+3. Ensure MySQL service is running and `expense_tracker` database exists:
+   ```sql
+   CREATE DATABASE IF NOT EXISTS expense_tracker;
+   ```
+4. Run Spring Boot application via Maven Wrapper:
+   ```powershell
+   .\mvnw.cmd spring-boot:run
+   ```
+   *Backend starts at `http://localhost:8080/api`*
 
-Compile and run the Spring Boot application using Maven:
+---
+
+### 🚀 Step 2: Start Frontend (React + Vite)
+
+1. Open a second PowerShell terminal:
+   ```powershell
+   cd "d:\projects\expensess tracker\expensess tracker\frontend"
+   ```
+2. Install dependencies:
+   ```powershell
+   npm install
+   ```
+3. Start development server:
+   ```powershell
+   npm run dev
+   ```
+   *Frontend starts at `http://localhost:5173/`*
+
+---
+
+## 💻 20. TERMINAL COMMAND REFERENCE
+
+| Purpose | Terminal Command |
+| :--- | :--- |
+| **Check Java Version** | `java -version` |
+| **Check Maven Wrapper** | `.\mvnw.cmd -version` |
+| **Compile Backend** | `.\mvnw.cmd compile` |
+| **Start Backend Server** | `.\mvnw.cmd spring-boot:run` |
+| **Install Frontend Dependencies** | `npm install` |
+| **Start Frontend Dev Server** | `npm run dev` |
+| **Build Frontend Production Distribution** | `npm run build` |
+| **Check Git Status** | `git status` |
+| **View Commit History** | `git log --oneline -5` |
+
+---
+
+## ⚠️ 21. PORT TROUBLESHOOTING
+
+If a port conflict occurs during launch:
+
+### Check Backend Port 8080
 ```powershell
-# Windows PowerShell
-cd "d:\projects\expensess tracker\expensess tracker"
-$env:JAVA_HOME="C:\Program Files\Java\jdk-21.0.11"
-.\mvnw clean compile
-.\mvnw spring-boot:run
+Get-NetTCPConnection -LocalPort 8080 -State Listen
 ```
-The backend server will start on **`http://localhost:8080`**.
-
-### 3. Frontend Installation & Launch
-Navigate to the frontend directory, install dependencies, and run the Vite development server:
+If an existing Spring Boot instance is active, do not launch a second copy. To free port 8080:
 ```powershell
-# Windows PowerShell
-cd "d:\projects\expensess tracker\frontend"
-npm install
-npm run dev
-```
-The application interface will open at **`http://localhost:5173`** (or `http://localhost:8443`).
-
----
-
-## 🔐 20. Environment Variables & Secrets
-
-Do NOT commit real database passwords or JWT secret keys to version control repositories. Recommended environment variables for production environments:
-
-```env
-# Database Credentials
-SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/expense_tracker
-SPRING_DATASOURCE_USERNAME=your_db_user
-SPRING_DATASOURCE_PASSWORD=your_db_password
-
-# Security Secrets
-JWT_SECRET_KEY=your_base64_encoded_256bit_secret_key_here
-
-# Frontend API Endpoint
-VITE_API_URL=http://localhost:8080/api
+Stop-Process -Id <PID> -Force
 ```
 
----
-
-## 🧪 21. API Testing via Postman
-
-1. **Register a User:**  
-   `POST http://localhost:8080/api/auth/register` with `{ "fullName": "Test User", "email": "test@example.com", "password": "password123" }`.
-2. **Login & Extract JWT:**  
-   `POST http://localhost:8080/api/auth/login` with `{ "email": "test@example.com", "password": "password123" }`. Copy the returned `token`.
-3. **Authenticated Endpoint Request:**  
-   `GET http://localhost:8080/api/dashboard`  
-   Header: `Authorization: Bearer <token>`. Verify `200 OK` JSON response.
-
----
-
-## 🛡️ 22. Security Testing Scenarios
-
+### Check Frontend Port 5173
 ```powershell
-# 1. Test Missing Token (Should return 401 Unauthorized)
-curl -i http://localhost:8080/api/transactions
-
-# 2. Test Invalid Token (Should return 401 Unauthorized)
-curl -i -H "Authorization: Bearer invalid_token_str" http://localhost:8080/api/dashboard
-
-# 3. Test Cross-Tenant Resource Access (User A attempting to access User B ID)
-curl -i -H "Authorization: Bearer USER_A_TOKEN" -X DELETE http://localhost:8080/api/transactions/USER_B_TRANSACTION_ID
-# Result: 401/403 Error - "Unauthorized transaction access"
+Get-NetTCPConnection -LocalPort 5173 -State Listen
+```
+To terminate a hanging node process on port 5173:
+```powershell
+taskkill /F /PID <PID>
 ```
 
 ---
 
-## 💻 23. Frontend Architecture
+## 🌿 22. GIT & VERSION CONTROL
 
-The frontend follows a decoupled data service flow:
+Standard feature-driven workflow:
 
-```mermaid
-flowchart LR
-    Views["React Pages & Modals"] --> Context["AppContext\n(Global State & Selectors)"]
-    Context --> API["services/api.js\n(Centralized Fetch Layer)"]
-    API --> Server["Spring Boot REST API"]
+```text
+Working Code ──> Local Testing ──> git status ──> git add . ──> git commit -m "..." ──> git push origin main
 ```
 
-### Centralized `request()` Function in `src/services/api.js`:
-* Automatically retrieves `token` from `localStorage`.
-* Adds `Authorization: Bearer <token>` header to all requests.
-* Intercepts `401`/`403` HTTP responses and raises user-friendly UI alerts.
+1. **Status check:** `git status`
+2. **Stage modified files:** `git add .`
+3. **Commit changes:** `git commit -m "feat: updated vite port configuration"`
+4. **Push to repository:** `git push origin main`
 
 ---
 
-## 🎨 24. UI Features & Design System
+## 🤖 23. AI-ASSISTED DEVELOPMENT
 
-* **Dashboard Page:** Financial health cards, interactive Recharts charts, and recent transaction audit table.
-* **Transactions Page:** Real-time search, category/type filtering, date/amount sorting, and pagination.
-* **Budgets Page:** Spending limit progress bars with warning states and budget creation/editing modals.
-* **Savings Goals Page:** Ring progress charts, milestone percentage indicators, target date countdowns, and creation modals.
-* **Analytics Page:** Range filter toggles (`This Week`, `This Month`, `Last 3 Months`, `This Year`) driving area, bar, line, and pie charts.
-* **Profile Page:** Editable user details with dynamic initial badge icons.
-* **Settings Page:** Currency switcher (`Rs.`, `$`, `€`, `£`), notification preference toggles, and sign-out controls.
+This project incorporated modern AI tooling to accelerate full-stack engineering:
+- **Visual Studio Code / IDE:** Core editor for source code management and execution.
+- **Antigravity:** AI agent used for architectural refactoring, component creation, security alignment, port resolution, and comprehensive technical documentation.
+- **Codex:** AI coding assistant utilized for code snippets, debugging, and initial refactoring logic.
 
----
-
-## 🔮 25. Future Improvements (Planned)
-
-* **Refresh Tokens:** Implement sliding refresh token expiration strategy.
-* **Password Reset & Email Verification:** Add SMTP integration for password recovery.
-* **CSV Export Execution:** Enable client-side CSV download from `Transactions` table.
-* **Containerization:** Add `docker-compose.yml` for single-command MySQL & Spring Boot deployments.
+All AI-generated contributions were verified through empirical testing and compiler verification.
 
 ---
 
-## ⭐ 26. Engineering Highlights
+## 🇱🇰 24. SRI LANKAN DEFAULTS & LOCALIZATION
 
-1. **Stateless JWT Security Architecture:** Decouples session management completely from backend memory using standard Bearer token validation.
-2. **Strict Multi-Tenant Scoping:** Guarantees database-level tenant isolation by enforcing security context ownership checks across all database mutations.
-3. **Transaction-Driven Financial Engine:** Computes balance, income, expenses, category spending, and monthly/weekly trends dynamically from historical transaction records.
-4. **Clean DTO Layer Boundaries:** Utilizes DTOs (`GoalResponse`, `BudgetResponse`, `TransactionResponse`, `UserProfileResponse`) to prevent sensitive fields or JPA proxies from exposing internal structure.
-
----
-
-## 🎓 27. Learning & Demonstration Highlights
-
-* **Full-Stack REST Architecture:** End-to-end integration between React and Spring Boot.
-* **Spring Security Authorization:** Custom `OncePerRequestFilter` integration and stateless session policies.
-* **Database Modeling & JPA:** Foreign key relationships, entity lifecycle management, and custom repository queries.
-* **Data Visualization:** Interactive chart rendering with Recharts and Tailwind CSS styling.
+The application incorporates regional defaults tailored for Sri Lankan users:
+- **Default Currency:** Sri Lankan Rupee (`Rs.` / `LKR`)
+- **Number Formatting:** Sri Lankan comma delimiter style (`en-IN` / `Rs. 100,000.00`)
+- **Supported Languages:** English (🇬🇧), Sinhala (සිංහல 🇱🇰), Tamil (தமிழ் 🇱🇰)
+- **Timezone Support:** `Asia/Colombo` compatible date handling
 
 ---
 
-## 📜 28. License
+## 🏁 25. DEVELOPMENT STATUS
 
-Licensing has not yet been specified for this repository.
+- [x] **Frontend Architecture:** Implemented with React 19, Tailwind CSS 4, and Recharts.
+- [x] **Backend API:** Layered REST API built on Spring Boot & Java 17/21.
+- [x] **Database Integration:** Relational schema running on MySQL via JPA / Hibernate.
+- [x] **Security Engine:** Stateless JWT filter and BCrypt password encryption.
+- [x] **Local Development:** Confirmed running on `localhost:5173` (Frontend) and `localhost:8080` (Backend).
+- [ ] **Cloud Deployment:** Production hosting on cloud platforms is planned for future phases.
+
+---
+
+## 🚧 26. FUTURE IMPROVEMENTS
+
+- Production cloud deployment (e.g., AWS / Render / Vercel).
+- Database migration tool integration (Flyway / Liquibase).
+- Email verification & password reset flows.
+- Export financial reports to PDF and CSV formats.
+- Docker containerization (`Dockerfile` and `docker-compose.yml`).
+- OpenAPI / Swagger documentation (`springdoc-openapi`).
+
+---
+
+## 🌟 27. ENGINEERING HIGHLIGHTS
+
+- **Decoupled Architecture:** Clean separation of concerns between React 19 SPA and Spring Boot backend.
+- **Stateless JWT Security:** Secure sessionless request authentication with BCrypt hashing.
+- **User Ownership Scoping:** Queries bound to authenticated user tokens, preventing data leaks across accounts.
+- **Dynamic Data Visualization:** Financial analytics rendered via Recharts responsive components.
+- **Sri Lankan Localization:** Regional defaults with LKR currency support and tri-lingual interface capability.
