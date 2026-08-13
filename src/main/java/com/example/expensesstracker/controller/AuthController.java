@@ -5,7 +5,12 @@ import com.example.expensesstracker.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.example.expensesstracker.dto.LoginRequest;
+import com.example.expensesstracker.dto.LoginResponse;
+import org.springframework.http.HttpStatus;
+import java.util.Map;
+
 //This Java class handles HTTP requests and returns data as responses
+@CrossOrigin
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -23,10 +28,19 @@ public class AuthController {
 
     }
     @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
 
-        authService.login(request.getEmail(), request.getPassword());
+        String token = authService.login(
+                request.getEmail(),
+                request.getPassword()
+        );
 
-        return ResponseEntity.ok("Login successful");
+        return ResponseEntity.ok(new LoginResponse(token));
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Map<String, String>> handleRuntimeException(RuntimeException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", ex.getMessage()));
     }
 }

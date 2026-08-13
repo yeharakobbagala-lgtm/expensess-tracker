@@ -1,13 +1,12 @@
 package com.example.expensesstracker.config;
 
-
 import com.example.expensesstracker.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -38,17 +37,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
 
-        String email = jwtService.extractEmail(token);
+        try {
 
-        UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(
-                        email,
-                        null,
-                        null
-                );
+            String email = jwtService.extractEmail(token);
 
-        SecurityContextHolder.getContext()
-                .setAuthentication(authentication);
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            email,
+                            null,
+                            null
+                    );
+
+            SecurityContextHolder.getContext()
+                    .setAuthentication(authentication);
+
+        } catch (Exception e) {
+
+            SecurityContextHolder.clearContext();
+
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        }
 
         filterChain.doFilter(request, response);
     }
