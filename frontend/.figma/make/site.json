@@ -1,0 +1,10 @@
+{
+  "description": "Design personalized farm-to-table restaurant menus featuring seasonal ingredients and dietary filters, enhancing dining experiences for health-conscious customers.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
