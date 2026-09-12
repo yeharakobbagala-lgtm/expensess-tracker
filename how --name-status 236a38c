@@ -1,0 +1,23 @@
+[33mcommit 236a38cfa765b9f07a73afb96ca2c2252cfc9263[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: yehara kobbegala <yehara.kobbagala@gmail.com>
+Date:   Sat Aug 15 02:40:58 2026 +0530
+
+    change
+    
+    change
+
+ frontend/.figma/make/analyze-routes |   4 [31m-[m
+ frontend/.figma/make/deploy         |   4 [31m-[m
+ frontend/.figma/make/deploy-preview |   5 [31m-[m
+ frontend/.figma/make/dev            |   4 [31m-[m
+ frontend/.figma/make/dev.json       |  22 [31m---[m
+ frontend/.figma/make/format         |   4 [31m-[m
+ frontend/.figma/make/install        |   4 [31m-[m
+ frontend/.figma/make/langserver     |   3 [31m-[m
+ frontend/.figma/make/site.json      |  10 [31m-[m
+ frontend/AGENTS.md                  |  44 [32m++[m[31m---[m
+ frontend/index.html                 |   8 [32m+[m[31m-[m
+ frontend/package-lock.json          |   4 [32m+[m[31m-[m
+ frontend/package.json               |   2 [32m+[m[31m-[m
+ frontend/vite.config.ts             | 371 [32m++[m[31m----------------------------------[m
+ 14 files changed, 39 insertions(+), 450 deletions(-)

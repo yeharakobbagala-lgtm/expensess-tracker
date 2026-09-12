@@ -3,8 +3,7 @@
  * when the Spring Boot backend is ready.
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
-
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://172.20.10.5:8080/api';
 async function request(method, path, body = null) {
   const token = localStorage.getItem('token');
   let res;
